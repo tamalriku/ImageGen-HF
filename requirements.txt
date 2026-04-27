@@ -1,0 +1,5 @@
+streamlit
+transformers
+python-dotenv
+Pillow
+huggingface-hub
