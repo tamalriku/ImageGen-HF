@@ -160,57 +160,128 @@ if st.session_state.generated_image:
         use_container_width=True
     )
     
-    # Regeneration UI — always visible after image is generated
+    # ── Edit & Regenerate Image (image-to-image) ──
     st.divider()
-    st.subheader("🔄 Regenerate Image")
-
-    # Show the previous prompt for reference
-    st.markdown(
-        f"**Previous prompt:** {st.session_state.current_prompt}"
-    )
-    st.markdown(
-        f"**Model used:** {st.session_state.selected_model_name}"
+    st.subheader("✏️ Edit This Image")
+    st.caption(
+        "Describe how you'd like to change the generated image. "
+        "The AI will use the current image as a starting point and apply your edits."
     )
 
-    # New prompt input
-    new_prompt = st.text_area(
-        "Enter a new prompt (or edit the previous one):",
-        value=st.session_state.current_prompt,
+    # Show context about the current image
+    st.markdown(f"**Original prompt:** {st.session_state.current_prompt}")
+    st.markdown(f"**Model used:** {st.session_state.selected_model_name}")
+
+    # Edit prompt
+    edit_prompt = st.text_area(
+        "Describe the changes you want:",
+        placeholder="e.g. 'Make the sky purple and add northern lights' or 'Change the style to watercolor painting'",
         height=100,
-        key="regen_prompt_area",
+        key="edit_prompt_area",
     )
 
-    # Option to switch model for regeneration
-    use_different_model = st.checkbox(
-        "Use a different model for regeneration", key="switch_model_checkbox"
-    )
-    regen_model_id = st.session_state.selected_model_id
-    regen_model_name = st.session_state.selected_model_name
-
-    if use_different_model:
-        regen_option = st.selectbox(
-            "Select model for regeneration",
-            model_options,
-            key="regen_model_select",
+    # Advanced options in an expander
+    with st.expander("⚙️ Advanced Options"):
+        # Strength slider — how much the image should change
+        strength = st.slider(
+            "Transformation Strength",
+            min_value=0.1,
+            max_value=1.0,
+            value=0.65,
+            step=0.05,
+            help="Low = subtle changes (keeps more of the original). High = dramatic changes.",
+            key="strength_slider",
         )
-        regen_data = model_info[regen_option]
-        regen_model_id = regen_data["id"]
-        regen_model_name = regen_data["name"]
 
-    # Regenerate button
-    if st.button("🔄 Regenerate Image", use_container_width=True, key="regenerate_btn"):
-        if new_prompt.strip():
-            with st.spinner(f"Regenerating with {regen_model_name}..."):
+        # Negative prompt
+        negative_prompt = st.text_input(
+            "Negative prompt (what to avoid):",
+            placeholder="e.g. 'blurry, low quality, distorted'",
+            key="negative_prompt_input",
+        )
+
+        # Guidance scale
+        guidance_scale = st.slider(
+            "Guidance Scale",
+            min_value=1.0,
+            max_value=20.0,
+            value=7.5,
+            step=0.5,
+            help="How closely to follow the prompt. Higher = stricter adherence.",
+            key="guidance_scale_slider",
+        )
+
+    # Image-to-image compatible models
+    img2img_models = [
+        {"name": "Stable Diffusion XL (Recommended)", "id": "stabilityai/stable-diffusion-xl-base-1.0"},
+        {"name": "FLUX.1-dev", "id": "black-forest-labs/FLUX.1-dev"},
+        {"name": "Stable Diffusion 3 Medium", "id": "stabilityai/stable-diffusion-3-medium"},
+        {"name": "DreamShaper", "id": "Lykon/dreamshaper-8"},
+    ]
+    img2img_model_names = [m["name"] for m in img2img_models]
+    img2img_model_lookup = {m["name"]: m["id"] for m in img2img_models}
+
+    edit_model_name = st.selectbox(
+        "Model for editing:",
+        img2img_model_names,
+        key="edit_model_select",
+    )
+    edit_model_id = img2img_model_lookup[edit_model_name]
+
+    # Edit button
+    if st.button("🎨 Apply Changes", use_container_width=True, key="apply_edit_btn"):
+        if not edit_prompt.strip():
+            st.warning("Please describe the changes you want to make!")
+        else:
+            # Convert current image to bytes for the API
+            img_buffer = BytesIO()
+            st.session_state.generated_image.save(img_buffer, format="PNG")
+            img_buffer.seek(0)
+
+            with st.spinner(f"Editing image with {edit_model_name}..."):
                 try:
-                    new_image = client.text_to_image(
-                        new_prompt, model=regen_model_id
-                    )
-                    st.session_state.generated_image = new_image
-                    st.session_state.current_prompt = new_prompt
-                    st.session_state.selected_model_id = regen_model_id
-                    st.session_state.selected_model_name = regen_model_name
+                    kwargs = {
+                        "image": img_buffer,
+                        "prompt": edit_prompt,
+                        "model": edit_model_id,
+                        "strength": strength,
+                        "guidance_scale": guidance_scale,
+                    }
+                    if negative_prompt.strip():
+                        kwargs["negative_prompt"] = negative_prompt
+
+                    edited_image = client.image_to_image(**kwargs)
+
+                    # Store old image in history before overwriting
+                    if "image_history" not in st.session_state:
+                        st.session_state.image_history = []
+                    st.session_state.image_history.append({
+                        "image": st.session_state.generated_image,
+                        "prompt": st.session_state.current_prompt,
+                    })
+
+                    st.session_state.generated_image = edited_image
+                    st.session_state.current_prompt = edit_prompt
+                    st.session_state.selected_model_name = edit_model_name
+                    st.session_state.selected_model_id = edit_model_id
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error regenerating image: {str(e)}")
-        else:
-            st.warning("Please enter a prompt!")
+                    st.error(f"Error editing image: {str(e)}")
+
+    # Show edit history if it exists
+    if "image_history" in st.session_state and st.session_state.image_history:
+        st.divider()
+        st.subheader("🕐 Edit History")
+        st.caption("Previous versions of your image (most recent first)")
+        for i, entry in enumerate(reversed(st.session_state.image_history)):
+            with st.expander(f"Version {len(st.session_state.image_history) - i}: \"{entry['prompt'][:60]}...\""):
+                st.image(entry["image"], use_container_width=True)
+                st.caption(f"Prompt: {entry['prompt']}")
+                if st.button(
+                    "↩️ Revert to this version",
+                    key=f"revert_btn_{i}",
+                    use_container_width=True,
+                ):
+                    st.session_state.generated_image = entry["image"]
+                    st.session_state.current_prompt = entry["prompt"]
+                    st.rerun()
