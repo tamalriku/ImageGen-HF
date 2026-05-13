@@ -1,4 +1,5 @@
 import os
+import base64
 import streamlit as st
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
@@ -21,6 +22,10 @@ if "selected_model_id" not in st.session_state:
     st.session_state.selected_model_id = None
 if "selected_model_name" not in st.session_state:
     st.session_state.selected_model_name = None
+if "style_description" not in st.session_state:
+    st.session_state.style_description = None
+if "reference_image_bytes" not in st.session_state:
+    st.session_state.reference_image_bytes = None
 
 # Get API key from secrets or environment
 hf_token = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
@@ -282,6 +287,178 @@ if st.session_state.generated_image:
                     st.session_state.selected_model_id = edit_model_id
                     st.success("✅ Image edited successfully!")
                     st.rerun()
+
+    # ── Style Transfer ──
+    st.divider()
+    st.subheader("🖌️ Style Transfer")
+    st.caption(
+        "Upload a reference image to analyze its artistic style, "
+        "then apply that style to your generated image."
+    )
+
+    # Reference image uploader
+    ref_image_file = st.file_uploader(
+        "Upload a reference image:",
+        type=["png", "jpg", "jpeg", "webp"],
+        key="ref_image_uploader",
+    )
+
+    if ref_image_file is not None:
+        ref_bytes = ref_image_file.getvalue()
+        ref_pil = Image.open(BytesIO(ref_bytes))
+
+        # Show reference image preview
+        st.image(ref_pil, caption="Reference Image", width=300)
+
+        # --- Analyze Style button ---
+        if st.button("🔍 Analyze Style", use_container_width=True, key="analyze_style_btn"):
+            with st.spinner("Analyzing the style of the reference image..."):
+                try:
+                    # Encode image as base64 data URL for the vision model
+                    ref_b64 = base64.b64encode(ref_bytes).decode("utf-8")
+                    mime_type = ref_image_file.type or "image/png"
+                    data_url = f"data:{mime_type};base64,{ref_b64}"
+
+                    # Use a vision model to analyze the style
+                    style_messages = [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": data_url},
+                                },
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        "Analyze the artistic style of this image in detail. "
+                                        "Describe the following aspects in a concise paragraph that can be used "
+                                        "as a style prompt for image generation:\n"
+                                        "- Color palette (specific colors, warm/cool tones, saturation)\n"
+                                        "- Art technique (oil painting, watercolor, digital art, photography, etc.)\n"
+                                        "- Lighting (soft, dramatic, natural, neon, etc.)\n"
+                                        "- Mood/atmosphere (dreamy, dark, vibrant, serene, etc.)\n"
+                                        "- Texture and detail level\n"
+                                        "- Any distinctive visual elements or patterns\n\n"
+                                        "Output ONLY the style description as a single paragraph, nothing else. "
+                                        "Start with 'In the style of...'"
+                                    ),
+                                },
+                            ],
+                        }
+                    ]
+
+                    # Try vision models in order of preference
+                    vision_models = [
+                        "Qwen/Qwen2.5-VL-72B-Instruct",
+                        "Qwen/Qwen2.5-VL-32B-Instruct",
+                        "meta-llama/Llama-3.2-11B-Vision-Instruct",
+                    ]
+                    style_text = None
+                    for vm in vision_models:
+                        if style_text is not None:
+                            break
+                        try:
+                            response = client.chat_completion(
+                                model=vm,
+                                messages=style_messages,
+                                max_tokens=300,
+                            )
+                            style_text = response.choices[0].message.content
+                        except Exception:
+                            continue
+
+                    if style_text:
+                        st.session_state.style_description = style_text
+                        st.session_state.reference_image_bytes = ref_bytes
+                        st.rerun()
+                    else:
+                        st.error("Could not analyze style. No vision model available.")
+                except Exception as e:
+                    st.error(f"Error analyzing style: {str(e)}")
+
+        # Show style analysis result if available
+        if st.session_state.style_description:
+            st.success("✅ Style analyzed!")
+            style_prompt = st.text_area(
+                "Detected style (you can edit this):",
+                value=st.session_state.style_description,
+                height=120,
+                key="style_prompt_area",
+            )
+
+            # Style strength
+            style_strength = st.slider(
+                "Style Transfer Strength",
+                min_value=0.1,
+                max_value=1.0,
+                value=0.70,
+                step=0.05,
+                help="How strongly to apply the style. Low = subtle, High = dramatic.",
+                key="style_strength_slider",
+            )
+
+            # Model selection for style transfer (reuse img2img models)
+            style_transfer_options = [
+                ("FLUX.2-dev via fal-ai", "fal-ai", "black-forest-labs/FLUX.2-dev"),
+                ("FLUX.1-Kontext-dev via fal-ai", "fal-ai", "black-forest-labs/FLUX.1-Kontext-dev"),
+                ("Qwen Image Edit via fal-ai", "fal-ai", "Qwen/Qwen-Image-Edit-2511"),
+            ]
+            st_option_names = [o[0] for o in style_transfer_options]
+
+            st_selected_idx = st.selectbox(
+                "Model for style transfer:",
+                range(len(st_option_names)),
+                format_func=lambda i: st_option_names[i],
+                key="style_model_select",
+            )
+            _, st_provider, st_model_id = style_transfer_options[st_selected_idx]
+
+            # Apply Style button
+            if st.button("🖌️ Apply Style", use_container_width=True, key="apply_style_btn"):
+                # Build the style transfer prompt
+                full_style_prompt = (
+                    f"{st.session_state.current_prompt}. {style_prompt}"
+                )
+
+                # Convert generated image to bytes
+                gen_buffer = BytesIO()
+                st.session_state.generated_image.save(gen_buffer, format="PNG")
+                gen_bytes = gen_buffer.getvalue()
+
+                with st.spinner(f"Applying style via {st_provider}..."):
+                    try:
+                        style_client = InferenceClient(
+                            provider=st_provider,
+                            api_key=hf_token,
+                        )
+                        styled_image = style_client.image_to_image(
+                            gen_bytes,
+                            prompt=full_style_prompt,
+                            model=st_model_id,
+                            strength=style_strength,
+                        )
+
+                        # Save to history before overwriting
+                        if "image_history" not in st.session_state:
+                            st.session_state.image_history = []
+                        st.session_state.image_history.append({
+                            "image": st.session_state.generated_image,
+                            "prompt": st.session_state.current_prompt,
+                        })
+
+                        st.session_state.generated_image = styled_image
+                        st.session_state.current_prompt = full_style_prompt
+                        st.session_state.selected_model_name = st_option_names[st_selected_idx]
+                        st.session_state.selected_model_id = st_model_id
+                        st.success("✅ Style applied successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(
+                            f"❌ Style transfer failed with **{st_provider}** + **{st_model_id}**\n\n"
+                            f"**Error:** {str(e)}\n\n"
+                            f"💡 Try a different model from the dropdown."
+                        )
 
     # Show edit history if it exists
     if "image_history" in st.session_state and st.session_state.image_history:
