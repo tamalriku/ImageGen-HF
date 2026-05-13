@@ -160,34 +160,57 @@ if st.session_state.generated_image:
         use_container_width=True
     )
     
-    # Regeneration UI
+    # Regeneration UI — always visible after image is generated
     st.divider()
-    with st.expander("✏️ Edit & Regenerate", expanded=False):
-        st.markdown(f"**Model used:** {st.session_state.selected_model_name}")
-        edited_prompt = st.text_area(
-            "Edit your prompt and regenerate:",
-            value=st.session_state.current_prompt,
-            height=100,
-            key="edit_prompt_area"
+    st.subheader("🔄 Regenerate Image")
+
+    # Show the previous prompt for reference
+    st.markdown(
+        f"**Previous prompt:** {st.session_state.current_prompt}"
+    )
+    st.markdown(
+        f"**Model used:** {st.session_state.selected_model_name}"
+    )
+
+    # New prompt input
+    new_prompt = st.text_area(
+        "Enter a new prompt (or edit the previous one):",
+        value=st.session_state.current_prompt,
+        height=100,
+        key="regen_prompt_area",
+    )
+
+    # Option to switch model for regeneration
+    use_different_model = st.checkbox(
+        "Use a different model for regeneration", key="switch_model_checkbox"
+    )
+    regen_model_id = st.session_state.selected_model_id
+    regen_model_name = st.session_state.selected_model_name
+
+    if use_different_model:
+        regen_option = st.selectbox(
+            "Select model for regeneration",
+            model_options,
+            key="regen_model_select",
         )
-        
-        col_regen1, col_regen2 = st.columns(2)
-        with col_regen1:
-            if st.button("🔄 Regenerate Image", use_container_width=True, key="regenerate_btn"):
-                if edited_prompt.strip():
-                    with st.spinner(f"Regenerating with {st.session_state.selected_model_name}..."):
-                        try:
-                            new_image = client.text_to_image(
-                                edited_prompt,
-                                model=st.session_state.selected_model_id
-                            )
-                            st.session_state.generated_image = new_image
-                            st.session_state.current_prompt = edited_prompt
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error regenerating image: {str(e)}")
-                else:
-                    st.warning("Please enter a prompt!")
-        with col_regen2:
-            if st.button("❌ Close", use_container_width=True, key="close_edit_btn"):
-                st.rerun()
+        regen_data = model_info[regen_option]
+        regen_model_id = regen_data["id"]
+        regen_model_name = regen_data["name"]
+
+    # Regenerate button
+    if st.button("🔄 Regenerate Image", use_container_width=True, key="regenerate_btn"):
+        if new_prompt.strip():
+            with st.spinner(f"Regenerating with {regen_model_name}..."):
+                try:
+                    new_image = client.text_to_image(
+                        new_prompt, model=regen_model_id
+                    )
+                    st.session_state.generated_image = new_image
+                    st.session_state.current_prompt = new_prompt
+                    st.session_state.selected_model_id = regen_model_id
+                    st.session_state.selected_model_name = regen_model_name
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error regenerating image: {str(e)}")
+        else:
+            st.warning("Please enter a prompt!")
