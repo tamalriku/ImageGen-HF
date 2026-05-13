@@ -211,14 +211,14 @@ if st.session_state.generated_image:
             key="guidance_scale_slider",
         )
 
-    # Provider + model combinations to try for image-to-image
-    # Each entry is a (display_name, provider, model_id) tuple
+    # Provider + model combinations that ACTUALLY support image-to-image
+    # (verified from https://huggingface.co/models?pipeline_tag=image-to-image&inference_provider=all)
     img2img_options = [
-        ("FLUX.1-dev via fal-ai", "fal-ai", "black-forest-labs/FLUX.1-dev"),
-        ("SDXL via fal-ai", "fal-ai", "stabilityai/stable-diffusion-xl-base-1.0"),
-        ("FLUX.1-dev via replicate", "replicate", "black-forest-labs/FLUX.1-dev"),
-        ("SDXL via replicate", "replicate", "stabilityai/stable-diffusion-xl-base-1.0"),
-        ("FLUX.1-dev via wavespeed", "wavespeed", "black-forest-labs/FLUX.1-dev"),
+        ("FLUX.2-dev via fal-ai (Recommended)", "fal-ai", "black-forest-labs/FLUX.2-dev"),
+        ("FLUX.1-Kontext-dev via fal-ai", "fal-ai", "black-forest-labs/FLUX.1-Kontext-dev"),
+        ("Qwen Image Edit via fal-ai", "fal-ai", "Qwen/Qwen-Image-Edit-2511"),
+        ("FLUX.2-klein-9B via replicate", "replicate", "black-forest-labs/FLUX.2-klein-9B"),
+        ("Qwen Image Edit via wavespeed", "wavespeed", "Qwen/Qwen-Image-Edit-2509"),
     ]
     option_names = [o[0] for o in img2img_options]
 
