@@ -211,22 +211,24 @@ if st.session_state.generated_image:
             key="guidance_scale_slider",
         )
 
-    # Image-to-image compatible models
-    img2img_models = [
-        {"name": "Stable Diffusion XL (Recommended)", "id": "stabilityai/stable-diffusion-xl-base-1.0"},
-        {"name": "FLUX.1-dev", "id": "black-forest-labs/FLUX.1-dev"},
-        {"name": "Stable Diffusion 3 Medium", "id": "stabilityai/stable-diffusion-3-medium"},
-        {"name": "DreamShaper", "id": "Lykon/dreamshaper-8"},
+    # Provider + model combinations to try for image-to-image
+    # Each entry is a (display_name, provider, model_id) tuple
+    img2img_options = [
+        ("FLUX.1-dev via fal-ai", "fal-ai", "black-forest-labs/FLUX.1-dev"),
+        ("SDXL via fal-ai", "fal-ai", "stabilityai/stable-diffusion-xl-base-1.0"),
+        ("FLUX.1-dev via replicate", "replicate", "black-forest-labs/FLUX.1-dev"),
+        ("SDXL via replicate", "replicate", "stabilityai/stable-diffusion-xl-base-1.0"),
+        ("FLUX.1-dev via wavespeed", "wavespeed", "black-forest-labs/FLUX.1-dev"),
     ]
-    img2img_model_names = [m["name"] for m in img2img_models]
-    img2img_model_lookup = {m["name"]: m["id"] for m in img2img_models}
+    option_names = [o[0] for o in img2img_options]
 
-    edit_model_name = st.selectbox(
-        "Model for editing:",
-        img2img_model_names,
+    selected_idx = st.selectbox(
+        "Model + Provider for editing:",
+        range(len(option_names)),
+        format_func=lambda i: option_names[i],
         key="edit_model_select",
     )
-    edit_model_id = img2img_model_lookup[edit_model_name]
+    _, edit_provider, edit_model_id = img2img_options[selected_idx]
 
     # Edit button
     if st.button("🎨 Apply Changes", use_container_width=True, key="apply_edit_btn"):
@@ -238,56 +240,32 @@ if st.session_state.generated_image:
             st.session_state.generated_image.save(img_buffer, format="PNG")
             img_bytes = img_buffer.getvalue()
 
-            with st.spinner(f"Editing image with {edit_model_name}..."):
+            with st.spinner(f"Editing image via {edit_provider}..."):
                 edited_image = None
-                all_errors = []
 
-                # --- Try image-to-image with multiple providers ---
-                img2img_providers = ["fal-ai", "replicate", "wavespeed"]
-                for provider_name in img2img_providers:
-                    if edited_image is not None:
-                        break
-                    try:
-                        img2img_client = InferenceClient(
-                            provider=provider_name,
-                            api_key=hf_token,
-                        )
-                        # Pass image as first positional arg (raw bytes)
-                        edited_image = img2img_client.image_to_image(
-                            img_bytes,
-                            prompt=edit_prompt,
-                            model=edit_model_id,
-                            strength=strength,
-                            guidance_scale=guidance_scale,
-                        )
-                    except Exception as e:
-                        all_errors.append(f"{provider_name}: {str(e)}")
-
-                # --- Fallback: combine prompts & use text-to-image ---
-                if edited_image is None:
-                    try:
-                        st.info(
-                            "ℹ️ Image-to-image not available for this model. "
-                            "Falling back to regeneration with your edited prompt.",
-                            icon="ℹ️",
-                        )
-                        combined_prompt = (
-                            f"{st.session_state.current_prompt}. "
-                            f"Modified: {edit_prompt}"
-                        )
-                        if negative_prompt.strip():
-                            combined_prompt += f". Avoid: {negative_prompt}"
-
-                        edited_image = client.text_to_image(
-                            combined_prompt, model=edit_model_id
-                        )
-                    except Exception as e2:
-                        error_details = "\n".join(all_errors)
-                        st.error(
-                            f"Error editing image.\n\n"
-                            f"**Image-to-image errors:**\n{error_details}\n\n"
-                            f"**Text-to-image fallback error:** {str(e2)}"
-                        )
+                try:
+                    img2img_client = InferenceClient(
+                        provider=edit_provider,
+                        api_key=hf_token,
+                    )
+                    # Pass image as raw bytes (first positional arg)
+                    edited_image = img2img_client.image_to_image(
+                        img_bytes,
+                        prompt=edit_prompt,
+                        model=edit_model_id,
+                        strength=strength,
+                        guidance_scale=guidance_scale,
+                    )
+                except Exception as e:
+                    st.error(
+                        f"❌ Image editing failed with **{edit_provider}** + **{edit_model_id}**\n\n"
+                        f"**Error:** {str(e)}\n\n"
+                        f"💡 **Tips:**\n"
+                        f"- Try a different Model + Provider combo from the dropdown\n"
+                        f"- Make sure your HF token has 'Inference Providers' permission enabled at "
+                        f"[hf.co/settings/tokens](https://hf.co/settings/tokens)\n"
+                        f"- Some providers may require a paid plan"
+                    )
 
                 if edited_image is not None:
                     # Store old image in history before overwriting
@@ -300,8 +278,9 @@ if st.session_state.generated_image:
 
                     st.session_state.generated_image = edited_image
                     st.session_state.current_prompt = edit_prompt
-                    st.session_state.selected_model_name = edit_model_name
+                    st.session_state.selected_model_name = option_names[selected_idx]
                     st.session_state.selected_model_id = edit_model_id
+                    st.success("✅ Image edited successfully!")
                     st.rerun()
 
     # Show edit history if it exists
