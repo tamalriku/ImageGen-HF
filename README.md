@@ -1,6 +1,6 @@
-# 🎨 Image Generator with Hugging Face
+# 🎨 Image Generator with Hugging Face and Streamlit
 
-A beautiful, user-friendly Streamlit web application that generates stunning images using state-of-the-art AI models from Hugging Face.
+A user-friendly Streamlit web application that generates stunning images using state-of-the-art AI models from Hugging Face.
 
 ## ✨ Features
 
