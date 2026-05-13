@@ -1,28 +1,30 @@
 # 🎨 Image Generator with Hugging Face and Streamlit
 
-A user-friendly Streamlit web application that generates stunning images using state-of-the-art AI models from Hugging Face.
+A powerful Streamlit web application for AI image generation, editing, and style transfer — powered by state-of-the-art models from Hugging Face.
 
 ## ✨ Features
 
-- **7 Powerful AI Models** to choose from, ranked by speed and quality
-- **Real-time Image Generation** with visual loading indicators
-- **Edit & Regenerate** - Refine your prompts and regenerate images iteratively
-- **One-Click Download** - Save generated images instantly
-- **Model Information** - See speed, quality, and use-case recommendations
-- **Beautiful UI** - Clean, intuitive interface with emojis for easy navigation
-- **Fast Performance** - Quick image generation with responsive design
+- **7 AI Models for Generation** — ranked by speed and quality
+- **Image Editing (img2img)** — modify your generated image with natural language instructions
+- **Style Transfer** — upload a reference image, AI analyzes its style, and applies it to your generation
+- **Vision-Powered Style Analysis** — uses Qwen2.5-VL or Llama Vision to understand artistic styles
+- **Edit History & Revert** — browse previous versions and revert to any point
+- **One-Click Download** — save generated images as PNG
+- **Multi-Provider Support** — routes through fal-ai, replicate, and wavespeed for maximum compatibility
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Python 3.8 or higher
-- A Hugging Face account with an API token
+- A Hugging Face account with an API token ([get one here](https://huggingface.co/settings/tokens))
 - Git (for deployment)
+
+> **Important:** Your HF token must have **"Make calls to inference providers"** permission enabled.
 
 ### Installation (Local)
 
-1. **Clone or download this repository**
+1. **Clone the repository**
    ```bash
    git clone <your-repo-url>
    cd HF_Test
@@ -51,9 +53,12 @@ A user-friendly Streamlit web application that generates stunning images using s
    HF_TOKEN = "your_huggingface_token_here"
    ```
    
-   Get your token from: https://huggingface.co/settings/tokens
+   Or create a `.env` file in the project root:
+   ```
+   HF_TOKEN=your_token_here
+   ```
 
-5. **Run the app locally**
+5. **Run the app**
    ```bash
    streamlit run main.py
    ```
@@ -62,25 +67,51 @@ A user-friendly Streamlit web application that generates stunning images using s
 
 ## 🎯 How to Use
 
-### Basic Workflow
-1. **Select a Model** - Choose from the dropdown in the sidebar (ranked by quality/speed)
-2. **View Model Info** - Click "Model Info" to see details about the selected model
-3. **Enter Your Prompt** - Describe what you want to generate
-4. **Generate** - Click the "🚀 Generate Image" button
-5. **Download** - Click the "📥 Download Image" button to save your image
+### 1. Generate an Image (Text-to-Image)
 
-### Refine Your Results with Edit & Regenerate
-1. **After generating an image**, scroll down and click the **"✏️ Edit & Regenerate"** expander
-2. **Modify your prompt** - Edit the text to refine your image (e.g., "add more colors", "make it darker", "remove the background")
-3. **Click "🔄 Regenerate Image"** - The app generates a new image with your edited prompt
-4. **Repeat as many times as needed** - Keep refining until you get the perfect result
-5. **Download when satisfied** - Save your final image
+1. **Select a Model** from the sidebar dropdown (ranked by quality/speed)
+2. **Enter your prompt** describing what you want to generate
+3. **Click "🚀 Generate Image"**
+4. **Download** your image with the "📥 Download Image" button
 
-**Pro Tip:** The model and image remain in context during regeneration, so you can iterate quickly without losing your progress!
+### 2. Edit Your Image (Image-to-Image)
+
+After generating an image, the **"✏️ Edit This Image"** section appears:
+
+1. **Describe the changes** you want (e.g., "Make the sky purple", "Add sunglasses", "Change to watercolor style")
+2. **Adjust advanced options** (optional):
+   - **Transformation Strength** — low = subtle changes, high = dramatic
+   - **Negative prompt** — describe what to avoid
+   - **Guidance Scale** — how strictly to follow your prompt
+3. **Select a model + provider** for editing
+4. **Click "🎨 Apply Changes"**
+
+> The AI uses your existing image as a starting point and modifies it based on your instructions — it's not generating from scratch.
+
+### 3. Style Transfer
+
+Transfer the artistic style from any reference image onto your generated image:
+
+1. **Upload a reference image** (the image whose style you want to copy)
+2. **Click "🔍 Analyze Style"** — a vision AI model examines the reference and describes its artistic style
+3. **Review/edit the style description** — you can tweak the analysis before applying
+4. **Adjust the strength slider** — how dramatically to apply the style
+5. **Click "🖌️ Apply Style"** — the style is applied to your generated image
+
+**How it works under the hood:**
+- A vision-language model (Qwen2.5-VL or Llama Vision) analyzes the reference image's color palette, art technique, lighting, mood, texture, and visual patterns
+- The style description is combined with your original prompt
+- The image-to-image model transforms your generated image to match the reference style
+
+### 4. Edit History & Revert
+
+Every edit and style transfer is saved to history:
+- **Browse previous versions** in the "🕐 Edit History" section
+- **Click "↩️ Revert to this version"** to go back to any previous state
 
 ## 📊 Available Models
 
-All models are ranked for your convenience:
+### Text-to-Image Generation
 
 | Rank | Model | Speed | Quality | Best For |
 |------|-------|-------|---------|----------|
@@ -92,14 +123,34 @@ All models are ranked for your convenience:
 | #6 | Playground v2.5 | ⚡ Fast | 👍 Good | Aesthetic focused |
 | #7 | DreamShaper | ⚡ Fast | 👍 Good | Versatile and creative |
 
-**Recommendation:** Start with #1 (FLUX.1-schnell) for a good balance of speed and quality. Use #2 (FLUX.1-dev) for your best results on important prompts.
+### Image-to-Image Editing & Style Transfer
+
+These models support taking an existing image and modifying it:
+
+| Model | Provider | Use Case |
+|-------|----------|----------|
+| FLUX.2-dev | fal-ai | ⭐ Recommended — best quality editing |
+| FLUX.1-Kontext-dev | fal-ai | Great context-aware editing |
+| Qwen Image Edit 2511 | fal-ai | Strong general-purpose editing |
+| FLUX.2-klein-9B | replicate | Lighter, faster edits |
+| Qwen Image Edit 2509 | wavespeed | Alternative provider option |
+
+### Vision Models (Style Analysis)
+
+Used automatically for analyzing reference image styles:
+
+| Model | Purpose |
+|-------|---------|
+| Qwen2.5-VL-72B-Instruct | Primary — best style understanding |
+| Qwen2.5-VL-32B-Instruct | Fallback — lighter but still capable |
+| Llama-3.2-11B-Vision-Instruct | Fallback — widely available |
 
 ## 🌐 Deploy to Streamlit Cloud
 
 ### Step 1: Push to GitHub
 
 1. Create a new repository on [GitHub](https://github.com/new)
-2. Initialize git and push your code:
+2. Push your code:
    ```bash
    git init
    git add .
@@ -120,82 +171,79 @@ All models are ranked for your convenience:
 ### Step 3: Add Your Secrets
 
 1. After deployment, click the **⋮** menu (top right)
-2. Select **Settings**
-3. Go to **Secrets**
-4. Add your token:
+2. Select **Settings** → **Secrets**
+3. Add your token:
    ```toml
    HF_TOKEN = "your_huggingface_token_here"
    ```
-5. The app will redeploy automatically
+4. The app will redeploy automatically
 
-**Your app is now live!** Share the URL with anyone. 🎉
+**Your app is now live!** 🎉
 
 ## 📋 Requirements
 
 All dependencies are listed in `requirements.txt`:
-- `streamlit` - Web app framework
-- `transformers` - ML models library
-- `langchain` - LLM framework
-- `langchain-huggingface` - Hugging Face integration
-- `python-dotenv` - Environment variables
-- `Pillow` - Image processing
-- `huggingface-hub` - Hugging Face API client
+- `streamlit` — Web app framework
+- `huggingface-hub` — Hugging Face Inference API client
+- `python-dotenv` — Environment variables
+- `Pillow` — Image processing
 
 ## ⚙️ Configuration
 
 ### Environment Variables
 
 The app looks for your HF token in this order:
-1. **Streamlit Secrets** (`.streamlit/secrets.toml`) - Recommended for deployment
-2. **Environment Variables** (`.env`) - For local development
+1. **Streamlit Secrets** (`.streamlit/secrets.toml`) — Recommended for deployment
+2. **Environment Variables** (`.env`) — For local development
 
-### Local Development (.env)
+### HF Token Permissions
 
-Create a `.env` file in the project root:
-```
-HF_TOKEN=your_token_here
-```
-
-**Note:** This file is ignored by git (see `.gitignore`) - your token won't be committed!
+Your token needs these permissions at [hf.co/settings/tokens](https://huggingface.co/settings/tokens):
+- ✅ **Make calls to inference providers** — Required for all features
+- ✅ **Read access to public gated repos** — For accessing gated models
 
 ## 🐛 Troubleshooting
-
-### "streamlit command not found"
-```bash
-# Install streamlit
-pip install streamlit
-# Or reinstall all requirements
-pip install -r requirements.txt
-```
 
 ### "HF_TOKEN not found"
 - Make sure `.streamlit/secrets.toml` exists with your token
 - Or create `.env` file with `HF_TOKEN=your_token`
 
+### Image editing fails with "not supported for task image-to-image"
+- The model you selected doesn't support image-to-image on that provider
+- Use one of the verified model+provider combos from the dropdown (FLUX.2-dev via fal-ai is recommended)
+
+### Style analysis fails
+- Vision models may be temporarily unavailable
+- The app tries 3 different vision models automatically
+- Try again after a few seconds
+
 ### Image generation is slow
 - Try model #1 (FLUX.1-schnell) for faster results
 - Use shorter, more specific prompts
 
-### "No such file or directory: main.py"
-- Make sure you're in the project directory
-- Check that `main.py` exists
-
-### Image doesn't display after download
-- Try refreshing the page (F5)
-- Regenerate the image
+### "Some providers may require a paid plan"
+- Some inference providers charge per request
+- Check your HF billing at [hf.co/settings/billing](https://huggingface.co/settings/billing)
 
 ## 📝 Tips for Better Results
 
-- **Be specific** - "A cute golden retriever wearing sunglasses on a beach" works better than "dog"
-- **Include style** - Add art styles like "oil painting", "cyberpunk", "watercolor"
-- **Mention lighting** - "soft lighting", "dramatic shadows", "golden hour"
-- **Use descriptive words** - More details = better results
-- **Try different models** - Each has a unique style
-- **Use Edit & Regenerate** - Instead of starting over, use the edit feature to refine your results iteratively
-  - Example: Start with "astronaut on the moon", then refine with "add more stars", "make it more cinematic", etc.
-  - This preserves context and lets you build on successful generations
+### Prompt Tips
+- **Be specific** — "A golden retriever wearing sunglasses on a beach at sunset" > "dog"
+- **Include art style** — "oil painting", "cyberpunk", "watercolor", "photograph"
+- **Mention lighting** — "soft lighting", "dramatic shadows", "golden hour"
+- **Add atmosphere** — "dreamy", "moody", "vibrant", "serene"
 
-### Example Prompts:
+### Editing Tips
+- **Low strength (0.2–0.4)** — for subtle tweaks like color adjustments
+- **Medium strength (0.5–0.7)** — for noticeable changes like style shifts
+- **High strength (0.8–1.0)** — for dramatic transformations
+
+### Style Transfer Tips
+- Use reference images with a **clear, distinctive style** (e.g., Van Gogh paintings, anime screenshots, neon photography)
+- **Edit the style description** before applying — you can emphasize or remove specific aspects
+- **Start with lower strength** and increase gradually
+
+### Example Prompts
 - "A futuristic city at night with flying cars, neon lights, cyberpunk style"
 - "A serene Japanese garden with koi fish, cherry blossoms, soft morning light"
 - "Portrait of an alien astronaut, detailed, sci-fi, professional lighting"
@@ -203,9 +251,9 @@ pip install -r requirements.txt
 ## 🤝 Contributing
 
 Feel free to improve this project! You can:
-- Add more models
-- Improve the UI
-- Add features like prompt history
+- Add more models as they become available
+- Improve the UI and add new features
+- Add prompt history and favorites
 - Create preset prompt templates
 
 ## 📜 License
@@ -217,6 +265,7 @@ This project uses Hugging Face models which have their own licenses. Check their
 - [Hugging Face Hub](https://huggingface.co)
 - [Streamlit Docs](https://docs.streamlit.io)
 - [Get API Token](https://huggingface.co/settings/tokens)
+- [HF Inference Providers](https://huggingface.co/docs/inference-providers)
 - [Deploy to Streamlit Cloud](https://docs.streamlit.io/streamlit-cloud/get-started/deploy-an-app)
 
 ## ❓ FAQ
@@ -228,13 +277,16 @@ A: Check the individual model licenses on Hugging Face.
 A: Model servers may be under heavy load. Try again or use a faster model (#1 or #3).
 
 **Q: Can I run this offline?**
-A: No, it requires internet connection to access Hugging Face models.
+A: No, it requires an internet connection to access Hugging Face models via inference providers.
 
 **Q: How much does this cost?**
-A: Streamlit Cloud hosting is free! Hugging Face may have rate limits for free tier.
+A: Streamlit Cloud hosting is free. Hugging Face provides free credits but some providers may charge per request.
 
-**Q: How do I update the models?**
-A: Edit `main.py` and modify the `models_data` list. Push to GitHub and it auto-deploys.
+**Q: What's the difference between Edit and Style Transfer?**
+A: **Edit** lets you describe changes in words (e.g., "make the sky red"). **Style Transfer** analyzes a reference image's visual style and applies it to your image automatically.
+
+**Q: Why do I need to select a provider for editing?**
+A: Not all providers support image-to-image. The app lists only verified model+provider combos that actually work.
 
 ---
 
