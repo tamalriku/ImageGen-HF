@@ -6,6 +6,7 @@ A beautiful, user-friendly Streamlit web application that generates stunning ima
 
 - **7 Powerful AI Models** to choose from, ranked by speed and quality
 - **Real-time Image Generation** with visual loading indicators
+- **Edit & Regenerate** - Refine your prompts and regenerate images iteratively
 - **One-Click Download** - Save generated images instantly
 - **Model Information** - See speed, quality, and use-case recommendations
 - **Beautiful UI** - Clean, intuitive interface with emojis for easy navigation
@@ -61,11 +62,21 @@ A beautiful, user-friendly Streamlit web application that generates stunning ima
 
 ## 🎯 How to Use
 
+### Basic Workflow
 1. **Select a Model** - Choose from the dropdown in the sidebar (ranked by quality/speed)
 2. **View Model Info** - Click "Model Info" to see details about the selected model
 3. **Enter Your Prompt** - Describe what you want to generate
 4. **Generate** - Click the "🚀 Generate Image" button
 5. **Download** - Click the "📥 Download Image" button to save your image
+
+### Refine Your Results with Edit & Regenerate
+1. **After generating an image**, scroll down and click the **"✏️ Edit & Regenerate"** expander
+2. **Modify your prompt** - Edit the text to refine your image (e.g., "add more colors", "make it darker", "remove the background")
+3. **Click "🔄 Regenerate Image"** - The app generates a new image with your edited prompt
+4. **Repeat as many times as needed** - Keep refining until you get the perfect result
+5. **Download when satisfied** - Save your final image
+
+**Pro Tip:** The model and image remain in context during regeneration, so you can iterate quickly without losing your progress!
 
 ## 📊 Available Models
 
@@ -180,6 +191,9 @@ pip install -r requirements.txt
 - **Mention lighting** - "soft lighting", "dramatic shadows", "golden hour"
 - **Use descriptive words** - More details = better results
 - **Try different models** - Each has a unique style
+- **Use Edit & Regenerate** - Instead of starting over, use the edit feature to refine your results iteratively
+  - Example: Start with "astronaut on the moon", then refine with "add more stars", "make it more cinematic", etc.
+  - This preserves context and lets you build on successful generations
 
 ### Example Prompts:
 - "A futuristic city at night with flying cars, neon lights, cyberpunk style"

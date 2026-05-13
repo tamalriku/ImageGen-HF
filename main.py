@@ -15,6 +15,12 @@ st.title("🎨 Image Generator with Hugging Face")
 # Initialize session state
 if "generated_image" not in st.session_state:
     st.session_state.generated_image = None
+if "current_prompt" not in st.session_state:
+    st.session_state.current_prompt = None
+if "selected_model_id" not in st.session_state:
+    st.session_state.selected_model_id = None
+if "selected_model_name" not in st.session_state:
+    st.session_state.selected_model_name = None
 
 # Get API key from secrets or environment
 hf_token = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
@@ -118,6 +124,9 @@ with col2:
 
 if clear_button:
     st.session_state.generated_image = None
+    st.session_state.current_prompt = None
+    st.session_state.selected_model_id = None
+    st.session_state.selected_model_name = None
     st.rerun()
 
 if generate_button:
@@ -128,12 +137,15 @@ if generate_button:
             try:
                 image = client.text_to_image(prompt, model=selected_model_id)
                 st.session_state.generated_image = image
+                st.session_state.current_prompt = prompt
+                st.session_state.selected_model_id = selected_model_id
+                st.session_state.selected_model_name = selected_model_name
             except Exception as e:
-                st.error(f"Error generating image: {str(e)}")
+                st.error(f"Error generating image: {str(e)})")
 
 # Display image if it exists
 if st.session_state.generated_image:
-    st.image(st.session_state.generated_image, caption=f"Generated with {selected_model_name}")
+    st.image(st.session_state.generated_image, caption=f"Generated with {st.session_state.selected_model_name}")
     
     # Convert PIL image to bytes for download
     img_byte_arr = BytesIO()
@@ -147,3 +159,35 @@ if st.session_state.generated_image:
         mime="image/png",
         use_container_width=True
     )
+    
+    # Regeneration UI
+    st.divider()
+    with st.expander("✏️ Edit & Regenerate", expanded=False):
+        st.markdown(f"**Model used:** {st.session_state.selected_model_name}")
+        edited_prompt = st.text_area(
+            "Edit your prompt and regenerate:",
+            value=st.session_state.current_prompt,
+            height=100,
+            key="edit_prompt_area"
+        )
+        
+        col_regen1, col_regen2 = st.columns(2)
+        with col_regen1:
+            if st.button("🔄 Regenerate Image", use_container_width=True, key="regenerate_btn"):
+                if edited_prompt.strip():
+                    with st.spinner(f"Regenerating with {st.session_state.selected_model_name}..."):
+                        try:
+                            new_image = client.text_to_image(
+                                edited_prompt,
+                                model=st.session_state.selected_model_id
+                            )
+                            st.session_state.generated_image = new_image
+                            st.session_state.current_prompt = edited_prompt
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error regenerating image: {str(e)}")
+                else:
+                    st.warning("Please enter a prompt!")
+        with col_regen2:
+            if st.button("❌ Close", use_container_width=True, key="close_edit_btn"):
+                st.rerun()
