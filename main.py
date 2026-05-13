@@ -239,7 +239,15 @@ if st.session_state.generated_image:
             img_buffer.seek(0)
 
             with st.spinner(f"Editing image with {edit_model_name}..."):
+                edited_image = None
+                img2img_error = None
+
+                # --- Attempt 1: True image-to-image via fal-ai provider ---
                 try:
+                    img2img_client = InferenceClient(
+                        provider="fal-ai",
+                        api_key=hf_token,
+                    )
                     kwargs = {
                         "image": img_buffer,
                         "prompt": edit_prompt,
@@ -250,8 +258,38 @@ if st.session_state.generated_image:
                     if negative_prompt.strip():
                         kwargs["negative_prompt"] = negative_prompt
 
-                    edited_image = client.image_to_image(**kwargs)
+                    edited_image = img2img_client.image_to_image(**kwargs)
+                except Exception as e:
+                    img2img_error = str(e)
+                    img_buffer.seek(0)  # reset buffer in case it was consumed
 
+                # --- Attempt 2: Fallback — combine prompts & use text-to-image ---
+                if edited_image is None:
+                    try:
+                        st.info(
+                            "ℹ️ Image-to-image not available for this model/provider. "
+                            "Falling back to regeneration with your edited prompt.",
+                            icon="ℹ️",
+                        )
+                        # Build a combined prompt that merges original + edits
+                        combined_prompt = (
+                            f"{st.session_state.current_prompt}. "
+                            f"Modified: {edit_prompt}"
+                        )
+                        if negative_prompt.strip():
+                            combined_prompt += f". Avoid: {negative_prompt}"
+
+                        edited_image = client.text_to_image(
+                            combined_prompt, model=edit_model_id
+                        )
+                    except Exception as e2:
+                        st.error(
+                            f"Error editing image.\n\n"
+                            f"**Image-to-image error:** {img2img_error}\n\n"
+                            f"**Text-to-image fallback error:** {str(e2)}"
+                        )
+
+                if edited_image is not None:
                     # Store old image in history before overwriting
                     if "image_history" not in st.session_state:
                         st.session_state.image_history = []
@@ -265,8 +303,6 @@ if st.session_state.generated_image:
                     st.session_state.selected_model_name = edit_model_name
                     st.session_state.selected_model_id = edit_model_id
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Error editing image: {str(e)}")
 
     # Show edit history if it exists
     if "image_history" in st.session_state and st.session_state.image_history:
