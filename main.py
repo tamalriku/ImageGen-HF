@@ -233,45 +233,44 @@ if st.session_state.generated_image:
         if not edit_prompt.strip():
             st.warning("Please describe the changes you want to make!")
         else:
-            # Convert current image to bytes for the API
+            # Convert current image to raw bytes for the API
             img_buffer = BytesIO()
             st.session_state.generated_image.save(img_buffer, format="PNG")
-            img_buffer.seek(0)
+            img_bytes = img_buffer.getvalue()
 
             with st.spinner(f"Editing image with {edit_model_name}..."):
                 edited_image = None
-                img2img_error = None
+                all_errors = []
 
-                # --- Attempt 1: True image-to-image via fal-ai provider ---
-                try:
-                    img2img_client = InferenceClient(
-                        provider="fal-ai",
-                        api_key=hf_token,
-                    )
-                    kwargs = {
-                        "image": img_buffer,
-                        "prompt": edit_prompt,
-                        "model": edit_model_id,
-                        "strength": strength,
-                        "guidance_scale": guidance_scale,
-                    }
-                    if negative_prompt.strip():
-                        kwargs["negative_prompt"] = negative_prompt
+                # --- Try image-to-image with multiple providers ---
+                img2img_providers = ["fal-ai", "replicate", "wavespeed"]
+                for provider_name in img2img_providers:
+                    if edited_image is not None:
+                        break
+                    try:
+                        img2img_client = InferenceClient(
+                            provider=provider_name,
+                            api_key=hf_token,
+                        )
+                        # Pass image as first positional arg (raw bytes)
+                        edited_image = img2img_client.image_to_image(
+                            img_bytes,
+                            prompt=edit_prompt,
+                            model=edit_model_id,
+                            strength=strength,
+                            guidance_scale=guidance_scale,
+                        )
+                    except Exception as e:
+                        all_errors.append(f"{provider_name}: {str(e)}")
 
-                    edited_image = img2img_client.image_to_image(**kwargs)
-                except Exception as e:
-                    img2img_error = str(e)
-                    img_buffer.seek(0)  # reset buffer in case it was consumed
-
-                # --- Attempt 2: Fallback — combine prompts & use text-to-image ---
+                # --- Fallback: combine prompts & use text-to-image ---
                 if edited_image is None:
                     try:
                         st.info(
-                            "ℹ️ Image-to-image not available for this model/provider. "
+                            "ℹ️ Image-to-image not available for this model. "
                             "Falling back to regeneration with your edited prompt.",
                             icon="ℹ️",
                         )
-                        # Build a combined prompt that merges original + edits
                         combined_prompt = (
                             f"{st.session_state.current_prompt}. "
                             f"Modified: {edit_prompt}"
@@ -283,9 +282,10 @@ if st.session_state.generated_image:
                             combined_prompt, model=edit_model_id
                         )
                     except Exception as e2:
+                        error_details = "\n".join(all_errors)
                         st.error(
                             f"Error editing image.\n\n"
-                            f"**Image-to-image error:** {img2img_error}\n\n"
+                            f"**Image-to-image errors:**\n{error_details}\n\n"
                             f"**Text-to-image fallback error:** {str(e2)}"
                         )
 
